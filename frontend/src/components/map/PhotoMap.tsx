@@ -33,7 +33,7 @@ export default function PhotoMap({ photos }: Props) {
 
     // Función global para navegación desde popup
     (window as unknown as { navigateToPhoto: (id: string) => void }).navigateToPhoto = (photoId: string) => {
-      router.push(`/dashboard/photos?photoId=${photoId}`);
+      router.push(`/dashboard/map?photoId=${photoId}`);
     };
 
     // Icono personalizado (amber)
