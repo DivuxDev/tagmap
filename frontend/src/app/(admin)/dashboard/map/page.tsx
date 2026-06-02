@@ -45,9 +45,18 @@ export default function MapPage() {
   const searchParams = useSearchParams();
   const photoIdParam = searchParams.get('photoId');
   
+  // Calcular fechas por defecto: últimos 30 días
+  const today = new Date();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  const formatDateForInput = (date: Date) => {
+    return date.toISOString().split('T')[0];
+  };
+  
   const [userId, setUserId] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(formatDateForInput(thirtyDaysAgo));
+  const [endDate, setEndDate] = useState(formatDateForInput(today));
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
 
@@ -85,7 +94,16 @@ export default function MapPage() {
     }
   }, [photoIdParam, router]);
 
-  const hasFilters = userId || startDate || endDate;
+  // Considerar filtros activos si hay userId o si las fechas difieren de los defaults
+  const defaultStartDate = formatDateForInput(thirtyDaysAgo);
+  const defaultEndDate = formatDateForInput(today);
+  const hasFilters = userId || (startDate !== defaultStartDate) || (endDate !== defaultEndDate);
+  
+  const resetFilters = () => {
+    setUserId('');
+    setStartDate(defaultStartDate);
+    setEndDate(defaultEndDate);
+  };
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)] lg:h-screen">
@@ -152,11 +170,11 @@ export default function MapPage() {
             {hasFilters && (
               <div className="flex items-end">
                 <button
-                  onClick={() => { setUserId(''); setStartDate(''); setEndDate(''); }}
+                  onClick={resetFilters}
                   className="flex items-center gap-1.5 text-xs text-red-400 border border-red-500/30 hover:bg-red-500/10 px-3 py-2.5 rounded-xl transition-colors w-full justify-center"
                 >
                   <X className="w-3.5 h-3.5" />
-                  Limpiar filtros
+                  Restaurar filtros
                 </button>
               </div>
             )}

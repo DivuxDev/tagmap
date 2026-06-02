@@ -54,11 +54,81 @@ export default function PhotoMap({ photos }: Props) {
       zoom: 8,
       zoomControl: true,
       attributionControl: false,
+      layers: [], // Iniciar sin capas, las añadiremos después
     });
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Definir capas base
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-    }).addTo(map);
+      attribution: '© OpenStreetMap'
+    });
+
+    // Capa satélite híbrida (imagen + etiquetas)
+    const satelliteImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: '© Esri'
+    });
+
+    const satelliteLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      pane: 'shadowPane' // Renderizar sobre el satélite
+    });
+
+    const satelliteLayer = L.layerGroup([satelliteImagery, satelliteLabels]);
+
+    const terrainLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      maxZoom: 17,
+      attribution: '© OpenTopoMap'
+    });
+
+    // Añadir capa por defecto (OSM)
+    osmLayer.addTo(map);
+
+    // Control de capas
+    const baseLayers = {
+      'Callejero': osmLayer,
+      'Satélite': satelliteLayer,
+      'Topográfico': terrainLayer,
+    };
+
+    L.control.layers(baseLayers, {}, { position: 'topright' }).addTo(map);
+
+    // Estilos personalizados para el control de capas (tema oscuro)
+    const style = document.createElement('style');
+    style.textContent = `
+      .leaflet-control-layers {
+        background: rgba(30, 41, 59, 0.95) !important;
+        border: 1px solid rgba(71, 85, 105, 0.4) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+      }
+      .leaflet-control-layers-toggle {
+        background-color: rgba(30, 41, 59, 0.95) !important;
+        border-radius: 8px !important;
+        width: 36px !important;
+        height: 36px !important;
+      }
+      .leaflet-control-layers-expanded {
+        padding: 12px !important;
+      }
+      .leaflet-control-layers-base label {
+        color: #e2e8f0 !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        margin: 6px 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+      }
+      .leaflet-control-layers-base label:hover {
+        color: #F59E0B !important;
+      }
+      .leaflet-control-layers-separator {
+        border-color: rgba(71, 85, 105, 0.3) !important;
+        margin: 8px 0 !important;
+      }
+    `;
+    document.head.appendChild(style);
 
     // Agregar marcadores
     const markers: ReturnType<typeof L.marker>[] = [];
