@@ -18,6 +18,9 @@ import {
   Shield,
   HardHat,
   KeyRound,
+  FolderSync,
+  Info,
+  Lock,
 } from 'lucide-react';
 import type { User } from '@/types';
 
@@ -52,6 +55,7 @@ export default function UsersPage() {
   const qc = useQueryClient();
   const { user: currentUser } = useAuth();
   const [search, setSearch] = useState('');
+  const [tab, setTab] = useState<'access' | 'folders'>('access');
   const [showCreate, setShowCreate] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [deleteUser, setDeleteUser] = useState<User | null>(null);
@@ -74,10 +78,18 @@ export default function UsersPage() {
     },
   });
 
-  const users = (data ?? []).filter(
+  const filtered = (data ?? []).filter(
     u =>
       u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase())
+  );
+  const accessUsers = filtered.filter(u => !isInternalUser(u));
+  const folderUsers = filtered.filter(isInternalUser);
+  const users = tab === 'access' ? accessUsers : folderUsers;
+
+  // Nombres de carpetas existentes (para avisar al crear un usuario de acceso)
+  const folderNames = new Set(
+    (data ?? []).filter(isInternalUser).map(u => u.name.trim().toLowerCase())
   );
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateForm>({
@@ -191,14 +203,63 @@ export default function UsersPage() {
         </div>
       </div>
 
+      {/* Pestañas */}
+      <div className="flex gap-1 bg-navy-800 rounded-xl p-1 mb-4 w-full sm:w-fit">
+        {([
+          { key: 'access', label: 'Usuarios de acceso', icon: Shield, count: accessUsers.length },
+          { key: 'folders', label: 'Carpetas NAS', icon: FolderSync, count: folderUsers.length },
+        ] as const).map(t => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                tab === t.key ? 'bg-brand-500 text-white' : 'text-navy-300 hover:text-white'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {t.label}
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                tab === t.key ? 'bg-white/20' : 'bg-navy-600'
+              }`}>
+                {t.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Nota explicativa */}
+      <div className="flex gap-3 text-sm text-navy-200 bg-blue-500/10 border border-blue-500/30 rounded-xl px-4 py-3 mb-6">
+        <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+        {tab === 'access' ? (
+          <p>
+            <strong className="text-white">Usuarios de acceso:</strong> personas que inician sesión en la web para
+            consultar fotos, el mapa y los informes. Se crean con el botón <em>Nuevo usuario</em> y
+            no pueden tener el mismo nombre que una carpeta del NAS.
+          </p>
+        ) : (
+          <p>
+            <strong className="text-white">Carpetas NAS:</strong> cada carpeta del NAS genera automáticamente un
+            usuario que agrupa sus fotos. <strong className="text-white">No inician sesión</strong> y no se pueden
+            editar ni desactivar desde aquí. Para añadir o renombrar uno, crea o renombra la carpeta en el NAS.
+          </p>
+        )}
+      </div>
+
       {/* Tabla */}
       <div className="admin-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-navy-500">
               <tr>
-                <th className="pb-4 text-left text-navy-300 font-medium">Usuario</th>
-                <th className="pb-4 text-left text-navy-300 font-medium hidden md:table-cell">Rol</th>
+                <th className="pb-4 text-left text-navy-300 font-medium">
+                  {tab === 'access' ? 'Usuario' : 'Carpeta'}
+                </th>
+                <th className="pb-4 text-left text-navy-300 font-medium hidden md:table-cell">
+                  {tab === 'access' ? 'Rol' : 'Tipo'}
+                </th>
                 <th className="pb-4 text-left text-navy-300 font-medium hidden lg:table-cell">Fotos</th>
                 <th className="pb-4 text-left text-navy-300 font-medium hidden xl:table-cell">Creado</th>
                 <th className="pb-4 text-left text-navy-300 font-medium">Estado</th>
@@ -219,30 +280,41 @@ export default function UsersPage() {
               ) : users.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-navy-300">
-                    {search ? 'No se encontraron usuarios' : 'Sin usuarios'}
+                    {search ? 'No se encontraron usuarios' : tab === 'access' ? 'Sin usuarios' : 'Sin carpetas del NAS'}
                   </td>
                 </tr>
               ) : (
-                users.map(user => (
+                users.map(user => {
+                  const internal = isInternalUser(user);
+                  return (
                   <tr key={user.id} className="hover:bg-navy-600/30 transition-colors">
                     <td className="py-3.5">
-                      <div>
-                        <p className="text-white font-medium">{user.name}</p>
-                        <p className="text-navy-300 text-xs mt-0.5">{user.email}</p>
+                      <div className="flex items-center gap-2.5">
+                        {internal && <FolderSync className="w-4 h-4 text-navy-300 shrink-0" />}
+                        <div className="min-w-0">
+                          <p className="text-white font-medium break-all">{user.name}</p>
+                          {!internal && <p className="text-navy-300 text-xs mt-0.5">{user.email}</p>}
+                        </div>
                       </div>
                     </td>
                     <td className="py-3.5 hidden md:table-cell">
-                      <span className={`role-badge ${
-                        user.role === 'ADMIN'
-                          ? 'bg-brand-500/20 text-brand-400'
-                          : 'bg-navy-500/40 text-navy-200'
-                      }`}>
-                        {user.role === 'ADMIN' ? (
-                          <><Shield className="w-3 h-3 mr-1" />Admin</>
-                        ) : (
-                          <><HardHat className="w-3 h-3 mr-1" />Trabajador</>
-                        )}
-                      </span>
+                      {internal ? (
+                        <span className="role-badge bg-navy-500/40 text-navy-200">
+                          <FolderSync className="w-3 h-3 mr-1" />Carpeta
+                        </span>
+                      ) : (
+                        <span className={`role-badge ${
+                          user.role === 'ADMIN'
+                            ? 'bg-brand-500/20 text-brand-400'
+                            : 'bg-navy-500/40 text-navy-200'
+                        }`}>
+                          {user.role === 'ADMIN' ? (
+                            <><Shield className="w-3 h-3 mr-1" />Admin</>
+                          ) : (
+                            <><HardHat className="w-3 h-3 mr-1" />Trabajador</>
+                          )}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3.5 text-navy-200 hidden lg:table-cell">
                       {user._count?.photos ?? 0}
@@ -251,21 +323,37 @@ export default function UsersPage() {
                       {formatDate(user.createdAt)}
                     </td>
                     <td className="py-3.5">
-                      <button
-                        onClick={() => toggleActiveMutation.mutate(user)}
-                        className={`inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1 transition-colors ${
-                          user.active
-                            ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
-                            : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                        }`}
-                      >
-                        {user.active ? 'Activo' : 'Inactivo'}
-                      </button>
+                      {canCreateUsers && !internal ? (
+                        <button
+                          onClick={() => toggleActiveMutation.mutate(user)}
+                          className={`inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1 transition-colors ${
+                            user.active
+                              ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                              : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                          }`}
+                        >
+                          {user.active ? 'Activo' : 'Inactivo'}
+                        </button>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1 ${
+                          user.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {user.active ? 'Activo' : 'Inactivo'}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3.5">
                       <div className="flex items-center justify-end gap-1">
-                        {/* Solo ADMIN puede editar usuarios NO internos */}
-                        {canCreateUsers && !isInternalUser(user) && (
+                        {/* Carpetas NAS: solo lectura. Usuarios de acceso: solo ADMIN edita */}
+                        {internal ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-xs text-navy-400"
+                            title="Gestionado automáticamente por el Folder Watcher"
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Automático</span>
+                          </span>
+                        ) : canCreateUsers && (
                           <>
                             <button
                               onClick={() => openEdit(user)}
@@ -293,7 +381,8 @@ export default function UsersPage() {
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -311,8 +400,27 @@ export default function UsersPage() {
               </button>
             </div>
 
+            <div className="flex gap-2 text-xs text-navy-200 bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2.5 mb-4">
+              <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+              <p>
+                Esto crea un <strong className="text-white">usuario de acceso</strong> para entrar en la web y ver las fotos.
+                Para que alguien <strong className="text-white">suba fotos</strong> no hace falta crear un usuario:
+                basta con crear su carpeta en el NAS y aparecerá sola en la pestaña <em>Carpetas NAS</em>.
+              </p>
+            </div>
+
             <form
-              onSubmit={handleSubmit(d => createMutation.mutate(d))}
+              onSubmit={handleSubmit(d => {
+                if (d.email.toLowerCase().endsWith('@tagmap.internal')) {
+                  setFormError('El dominio @tagmap.internal está reservado para las carpetas del NAS');
+                  return;
+                }
+                if (folderNames.has(d.name.trim().toLowerCase())) {
+                  setFormError(`Ya existe una carpeta del NAS llamada "${d.name.trim()}". Usa un nombre distinto.`);
+                  return;
+                }
+                createMutation.mutate(d);
+              })}
               className="space-y-4"
             >
               <div className="grid grid-cols-2 gap-3">

@@ -26,8 +26,11 @@ import {
   Navigation,
   CheckCircle2,
   Circle,
+  ChevronDown,
+  Search,
 } from 'lucide-react';
 import Image from 'next/image';
+import Pagination from '@/components/Pagination';
 import type { Photo, PaginatedPhotos, User, WorkerStats } from '@/types';
 import { downloadBlob } from '@/lib/utils';
 
@@ -43,6 +46,8 @@ export default function PhotosPage() {
   const [endDate, setEndDate] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [showDateFilter, setShowDateFilter] = useState(false);
+  const [showWorkerFilter, setShowWorkerFilter] = useState(false);
+  const [workerSearch, setWorkerSearch] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
 
@@ -250,7 +255,41 @@ export default function PhotosPage() {
 
       {/* ── Chips de trabajadores ────────────────────────────────────────── */}
       {workerStats && workerStats.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-5">
+        <div className="admin-card mb-5 !p-0 overflow-hidden">
+          <button
+            onClick={() => setShowWorkerFilter(v => !v)}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-navy-600/30 transition-colors"
+            aria-expanded={showWorkerFilter}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <UserIcon className="w-4 h-4 text-navy-300 shrink-0" />
+              <span className="text-sm font-medium text-white">Filtrar por trabajador</span>
+              <span className="text-xs text-navy-300 shrink-0">({workerStats.length})</span>
+              {selectedWorkerName && (
+                <span className="ml-1 truncate text-xs px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-400 font-medium">
+                  {selectedWorkerName}
+                </span>
+              )}
+            </div>
+            <ChevronDown
+              className={`w-4 h-4 text-navy-300 shrink-0 transition-transform ${showWorkerFilter ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {showWorkerFilter && (
+          <div className="border-t border-navy-500 p-4">
+          {workerStats.length > 8 && (
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-300" />
+              <input
+                value={workerSearch}
+                onChange={e => setWorkerSearch(e.target.value)}
+                placeholder="Buscar trabajador..."
+                className="input-dark pl-9 w-full"
+              />
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2 max-h-64 overflow-y-auto">
           <button
             onClick={() => { setUserId(''); setPage(1); }}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-sm font-medium transition-all border ${
@@ -267,7 +306,10 @@ export default function PhotosPage() {
             </span>
           </button>
 
-          {workerStats.map((w, idx) => {
+          {workerStats
+            .map((w, idx) => ({ w, idx }))
+            .filter(({ w }) => w.userName.toLowerCase().includes(workerSearch.toLowerCase()))
+            .map(({ w, idx }) => {
             const active = userId === w.userId;
             const initials = w.userName.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
             const colorCls = avatarColors[idx % avatarColors.length];
@@ -302,6 +344,9 @@ export default function PhotosPage() {
               <X className="w-3 h-3" />
               Limpiar
             </button>
+          )}
+          </div>
+          </div>
           )}
         </div>
       )}
@@ -424,26 +469,8 @@ export default function PhotosPage() {
             })}
           </div>
 
-          {pagination && pagination.totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3 mt-8">
-              <button
-                onClick={() => setPage(p => p - 1)}
-                disabled={page === 1}
-                className="px-4 py-2 bg-navy-700 border border-navy-500 text-navy-200 rounded-xl text-sm disabled:opacity-40 hover:border-navy-300 transition-colors"
-              >
-                Anterior
-              </button>
-              <span className="text-navy-300 text-sm">
-                Página {page} de {pagination.totalPages}
-              </span>
-              <button
-                onClick={() => setPage(p => p + 1)}
-                disabled={page === pagination.totalPages}
-                className="px-4 py-2 bg-navy-700 border border-navy-500 text-navy-200 rounded-xl text-sm disabled:opacity-40 hover:border-navy-300 transition-colors"
-              >
-                Siguiente
-              </button>
-            </div>
+          {pagination && (
+            <Pagination page={page} totalPages={pagination.totalPages} onChange={setPage} />
           )}
         </>
       )}

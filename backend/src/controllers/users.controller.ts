@@ -13,6 +13,40 @@ export const createUserValidators = [
   body('phone').optional().isMobilePhone('any').withMessage('Teléfono inválido'),
 ];
 
+// Usuarios virtuales creados por el Folder Watcher (una carpeta del NAS = un usuario)
+const INTERNAL_DOMAIN = '@tagmap.internal';
+
+function isInternalEmail(email: string): boolean {
+  return email.toLowerCase().endsWith(INTERNAL_DOMAIN);
+}
+
+function assertNotInternal(user: { email: string }): void {
+  if (isInternalEmail(user.email)) {
+    throw new AppError(
+      403,
+      'Este usuario representa una carpeta del NAS y se gestiona automáticamente. No se puede modificar desde aquí.'
+    );
+  }
+}
+
+// Evita crear/renombrar usuarios de acceso con el nombre de una carpeta del NAS
+async function assertNameNotFolder(name: string, excludeId?: string): Promise<void> {
+  const clash = await prisma.user.findFirst({
+    where: {
+      email: { endsWith: INTERNAL_DOMAIN },
+      name: { equals: name.trim(), mode: 'insensitive' },
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    select: { id: true },
+  });
+  if (clash) {
+    throw new AppError(
+      409,
+      `Ya existe una carpeta del NAS llamada "${name.trim()}". Usa un nombre distinto para el usuario de acceso.`
+    );
+  }
+}
+
 export async function listUsers(_req: AuthRequest, res: Response): Promise<void> {
   const users = await prisma.user.findMany({
     select: {
@@ -45,6 +79,11 @@ export async function createUser(req: AuthRequest, res: Response): Promise<void>
     role?: 'ADMIN' | 'WORKER';
     phone?: string;
   };
+
+  if (isInternalEmail(email)) {
+    throw new AppError(400, `El dominio ${INTERNAL_DOMAIN} está reservado para las carpetas del NAS`);
+  }
+  await assertNameNotFolder(name);
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
@@ -81,6 +120,14 @@ export async function updateUser(req: AuthRequest, res: Response): Promise<void>
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) {
     throw new AppError(404, 'Usuario no encontrado');
+  }
+  assertNotInternal(user);
+
+  if (email && isInternalEmail(email)) {
+    throw new AppError(400, `El dominio ${INTERNAL_DOMAIN} está reservado para las carpetas del NAS`);
+  }
+  if (name) {
+    await assertNameNotFolder(name, id);
   }
 
   // Verificar que el nuevo email no esté en uso por otro usuario
@@ -120,6 +167,7 @@ export async function deleteUser(req: AuthRequest, res: Response): Promise<void>
   if (!user) {
     throw new AppError(404, 'Usuario no encontrado');
   }
+  assertNotInternal(user);
 
   // Soft delete: desactivar en lugar de borrar para mantener historial
   await prisma.user.update({ where: { id }, data: { active: false } });
@@ -139,6 +187,7 @@ export async function changePassword(req: AuthRequest, res: Response): Promise<v
   if (!user) {
     throw new AppError(404, 'Usuario no encontrado');
   }
+  assertNotInternal(user);
 
   const hashedPassword = await hashPassword(newPassword);
   await prisma.user.update({ where: { id }, data: { password: hashedPassword } });

@@ -47,6 +47,11 @@ export default function DashboardPage() {
     },
   });
 
+  // Top 8 por número de fotos (workerStats viene ordenado por nombre)
+  const topWorkers = [...(workerStats ?? [])]
+    .sort((a, b) => b.totalPhotos - a.totalPhotos)
+    .slice(0, 8);
+
   const kpis = [
     {
       label: 'Total fotos',
@@ -173,53 +178,55 @@ export default function DashboardPage() {
           <ActivityChart data={activityData ?? []} />
         </div>
 
-        {/* Top trabajadores */}
-        <div className="admin-card">
-          <div className="mb-5">
-            <h2 className="font-semibold text-white">Top trabajadores</h2>
-            <p className="text-navy-300 text-xs mt-0.5">Total de fotos subidas</p>
+        {/* Resumen de trabajadores */}
+        <div className="admin-card flex flex-col">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-semibold text-white">Resumen de trabajadores</h2>
+            <span className="text-navy-300 text-xs">{workerStats?.length ?? 0} empleados</span>
           </div>
-          <WorkerChart data={(workerStats ?? []).slice(0, 8)} />
+          <div className="overflow-auto max-h-72 -mx-1 px-1">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-navy-700">
+                <tr className="border-b border-navy-500">
+                  <th className="pb-3 text-left text-navy-300 font-medium">Trabajador</th>
+                  <th className="pb-3 text-right text-navy-300 font-medium">Fotos</th>
+                  <th className="pb-3 text-right text-navy-300 font-medium hidden md:table-cell">Última actividad</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-navy-600">
+                {(workerStats ?? []).map((worker: WorkerStats) => (
+                  <tr key={worker.userId} className="hover:bg-navy-600/30 transition-colors">
+                    <td className="py-3 text-white font-medium truncate max-w-[10rem]" title={worker.userName}>
+                      {worker.userName.split(' ')[0]}
+                    </td>
+                    <td className="py-3 text-right">
+                      <span className="font-display text-lg text-brand-400 font-bold">
+                        {worker.totalPhotos}
+                      </span>
+                    </td>
+                    <td className="py-3 text-right text-navy-300 text-xs hidden md:table-cell whitespace-nowrap">
+                      {worker.lastActivity ? timeAgo(worker.lastActivity) : 'Sin actividad'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!workerStats?.length && (
+              <p className="text-center text-navy-300 text-sm py-8">
+                Sin datos de trabajadores
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Tabla de trabajadores */}
+      {/* Top trabajadores */}
       <div className="admin-card">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-semibold text-white">Resumen de trabajadores</h2>
-          <span className="text-navy-300 text-xs">{workerStats?.length ?? 0} empleados</span>
+        <div className="mb-5">
+          <h2 className="font-semibold text-white">Top trabajadores</h2>
+          <p className="text-navy-300 text-xs mt-0.5">Total de fotos subidas</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-navy-500">
-                <th className="pb-3 text-left text-navy-300 font-medium">Trabajador</th>
-                <th className="pb-3 text-right text-navy-300 font-medium">Fotos</th>
-                <th className="pb-3 text-right text-navy-300 font-medium hidden md:table-cell">Última actividad</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-navy-600">
-              {(workerStats ?? []).map((worker: WorkerStats) => (
-                <tr key={worker.userId} className="hover:bg-navy-600/30 transition-colors">
-                  <td className="py-3 text-white font-medium">{worker.userName.split(' ')[0]}</td>
-                  <td className="py-3 text-right">
-                    <span className="font-display text-lg text-brand-400 font-bold">
-                      {worker.totalPhotos}
-                    </span>
-                  </td>
-                  <td className="py-3 text-right text-navy-300 text-xs hidden md:table-cell">
-                    {worker.lastActivity ? timeAgo(worker.lastActivity) : 'Sin actividad'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!workerStats?.length && (
-            <p className="text-center text-navy-300 text-sm py-8">
-              Sin datos de trabajadores
-            </p>
-          )}
-        </div>
+        <WorkerChart data={topWorkers} />
       </div>
     </div>
   );
